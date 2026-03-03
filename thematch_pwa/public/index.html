@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+        content="Рассчитайте совместимость по зодиаку, биоритмам и нумерологии" />
+  <meta name="theme-color" content="#7C3AED" />
+
+  <!-- PWA meta -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TheMatch" />
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="TheMatch — Анализ совместимости" />
+  <meta property="og:description" content="Зодиак · Биоритмы · Нумерология" />
+  <meta property="og:type"        content="website" />
+
+  <title>TheMatch — Анализ совместимости</title>
+
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ---------------------------------------------------------------- -->
+  <!-- App header                                                         -->
+  <!-- ---------------------------------------------------------------- -->
+  <header class="app-header">
+    <div class="logo" aria-hidden="true">💫</div>
+    <h1>TheMatch</h1>
+    <p class="tagline">Зодиак · Биоритмы · Нумерология</p>
+  </header>
+
+  <main>
+
+    <!-- -------------------------------------------------------------- -->
+    <!-- Form section                                                     -->
+    <!-- -------------------------------------------------------------- -->
+    <section id="form-section">
+
+      <div class="card">
+        <p class="form-title">Введите даты рождения</p>
+
+        <div class="form-group">
+          <label for="date1">Ваша дата рождения</label>
+          <input type="date" id="date1" name="date1"
+                 autocomplete="off" required />
+        </div>
+
+        <div class="form-group">
+          <label for="date2">Дата рождения партнёра</label>
+          <input type="date" id="date2" name="date2"
+                 autocomplete="off" required />
+        </div>
+
+        <button class="btn-primary" id="calc-btn" type="button">
+          🔮 Рассчитать совместимость
+        </button>
+
+        <!-- Error message (hidden by default) -->
+        <div class="error-box hidden" id="error-box" role="alert"></div>
+      </div>
+
+      <!-- How it works -->
+      <div class="card" style="animation-delay:0.08s">
+        <p class="card-title">Как это работает</p>
+        <div class="score-row" style="padding:10px 0">
+          <span style="font-size:1.3rem">🔯</span>
+          <span class="score-label" style="margin-left:12px">
+            <strong style="color:var(--text)">Зодиак</strong> — совместимость знаков и стихий
+          </span>
+          <span class="score-val">35%</span>
+        </div>
+        <div class="score-row" style="padding:10px 0">
+          <span style="font-size:1.3rem">💫</span>
+          <span class="score-label" style="margin-left:12px">
+            <strong style="color:var(--text)">Биоритмы</strong> — сердечный, интуитивный, высший
+          </span>
+          <span class="score-val">35%</span>
+        </div>
+        <div class="score-row" style="border:none;padding:10px 0">
+          <span style="font-size:1.3rem">🔢</span>
+          <span class="score-label" style="margin-left:12px">
+            <strong style="color:var(--text)">Нумерология</strong> — числа судьбы и союза
+          </span>
+          <span class="score-val">30%</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- -------------------------------------------------------------- -->
+    <!-- Results section (populated by app.js)                           -->
+    <!-- -------------------------------------------------------------- -->
+    <section id="results-section" class="hidden" aria-live="polite">
+    </section>
+
+  </main>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
