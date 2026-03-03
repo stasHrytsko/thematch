@@ -7,24 +7,18 @@ class BiorhythmCalculator:
     
     # Периоды биоритмов в сутках
     CYCLES = {
-        'physical': 23.6884,      # Муладхара
-        'emotional': 28.426125,   # Свадхистана
-        'intellectual': 33.163812, # Манипура
+
         'heart': 37.901499,      # Анахата
-        'creative': 42.6392,      # Вишудха
         'intuitive': 47.3769,     # Аджна
         'higher': 52.1146        # Сахасрара
     }
     
     # Веса чакр (в сумме 100%)
     CHAKRA_WEIGHTS = {
-        'higher': 0.20,      # Сахасрара (20%)
-        'intuitive': 0.20,   # Аджна (20%)
-        'creative': 0.15,    # Вишудха (15%)
-        'heart': 0.15,       # Анахата (15%)
-        'intellectual': 0.10, # Манипура (10%)
-        'emotional': 0.10,   # Свадхистана (10%)
-        'physical': 0.10     # Муладхара (10%)
+        'heart': 0.30,       # Анахата (30%)
+        'intuitive': 0.30,   # Аджна (30%)
+        'higher': 0.40,      # Сахасрара (40%)
+
     }
 
     def calculate_days(self, birth_date: datetime) -> float:

@@ -1,38 +1,31 @@
 # Основные библиотеки
 import os
-import psutil
 import logging
 import sys
-import time
-import random
-import signal
 from collections import defaultdict
 from datetime import datetime, timedelta
 
 # Telegram бот
 import telebot
 from telebot import types
+from telebot import types, apihelper  # добавим apihelper
 
 # Импорт наших модулей
 from handlers.compatibility import register_compatibility_handlers
 from handlers.start import register_start_handlers
 from database.db import Database
-from services import ZodiacService, BiorhythmCalculator, NumerologyCalculator
+from services import ZodiacService, BiorhythmCalculator, NumerologyService
 from services.descriptions import CompatibilityDescriptions 
+from handlers.feedback import register_feedback_handlers
 
-# Настройка логирования
+# Базовое логирование
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('bot.log'),
-        logging.StreamHandler()
-    ]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
 # Проверка наличия токена
-TOKEN = os.getenv('BOT_TOKEN')
 TOKEN = os.getenv('BOT_TOKEN', "7919885602:AAGjt6IuXr8mQx1Fboyf3AE0WkA632ywwB0")
 
 if not TOKEN:
@@ -51,9 +44,32 @@ user_data = {
 db = Database()
 zodiac_service = ZodiacService()
 biorhythm_calc = BiorhythmCalculator()
-numerology_calc = NumerologyCalculator()
+numerology_calc = NumerologyService ()
 descriptions = CompatibilityDescriptions() 
-descriptions = CompatibilityDescriptions()
+
+# Точка входа для PythonAnywhere
+def application(env, start_response):
+    try:
+        # Добавить флаг инициализации чтобы не вызывать initialize_handlers() при каждом запросе
+        if not hasattr(application, 'is_initialized'):
+            initialize_handlers()
+            application.is_initialized = True
+            
+        start_response('200 OK', [('Content-Type', 'text/html')])
+        status = "Active" if bot.get_me() else "Inactive"
+        return [f"Bot is running. Status: {status}".encode()]
+    except Exception as e:
+        logger.error(f"WSGI error: {e}")
+        start_response('500 Internal Server Error', [('Content-Type', 'text/html')])
+        return [b"Bot error occurred"]
+
+# Настройка прокси для PythonAnywhere
+if 'PYTHONANYWHERE_DOMAIN' in os.environ:
+    apihelper.proxy = {
+        'https': 'http://proxy.server:3128'
+    }
+    apihelper.RETRY_ON_ERROR = True
+    apihelper.CONNECT_TIMEOUT = 30
 
 def cleanup_user_data(max_age_hours=24):
     """Очищает старые данные пользователей"""
@@ -69,84 +85,47 @@ def cleanup_user_data(max_age_hours=24):
     logger.info(f"Очищено {len(expired)} старых сессий")
 
 def initialize_handlers():
-    """Инициализация обработчиков команд"""
     try:
-        # Регистрируем обработчики
         register_start_handlers(bot, db)
         register_compatibility_handlers(
             bot=bot, 
-            db=db,  # добавить db
+            db=db,
             zodiac_service=zodiac_service, 
             biorhythm_calc=biorhythm_calc, 
             numerology_calc=numerology_calc,
-            descriptions=descriptions  # это был недостающий аргумент
+            descriptions=descriptions
         )
+        # Добавить регистрацию feedback
+        register_feedback_handlers(bot=bot, db=db)
         logger.info("Обработчики команд успешно зарегистрированы")
     except Exception as e:
         logger.error(f"Ошибка при регистрации обработчиков: {e}")
         raise
 
-def signal_handler(signum, frame):
-    """Обработка сигналов завершения"""
-    logger.info(f"Получен сигнал завершения {signum}")
-    cleanup_user_data()
-    if os.path.exists('bot.lock'):
-        os.remove('bot.lock')
-        logger.info("Lock-файл очищен")
-    sys.exit(0)
-
 def run_bot():
-    """Основная функция запуска бота"""
     try:
-        # Регистрируем обработчики сигналов
-        signal.signal(signal.SIGTERM, signal_handler)
-        signal.signal(signal.SIGINT, signal_handler)
-
-        # Инициализируем обработчики команд
         initialize_handlers()
-        
         logger.info("Бот успешно запущен и готов к работе!")
-
-        # Основной цикл
-        while True:
-            try:
-                # Периодическая очистка старых данных
-                cleanup_user_data()
-                
-                # Запуск бота
-                bot.infinity_polling(timeout=60, long_polling_timeout=30)
-                
-            except Exception as e:
-                logger.error(f"Ошибка в работе бота: {e}")
-                time.sleep(5)  # Пауза перед повторным запуском
+        
+        cleanup_user_data()  # Начальная очистка
+        
+        bot.infinity_polling(
+            timeout=60, 
+            long_polling_timeout=30,
+            skip_pending=True
+        )
 
     except Exception as e:
         logger.critical(f"Критическая ошибка при запуске бота: {e}")
         raise
 
+# точка входа
 if __name__ == "__main__":
-    # Проверка на уже запущенный экземпляр
-    if os.path.exists('bot.lock'):
-        logger.error("Бот уже запущен. Удалите 'bot.lock', если это не так.")
-        sys.exit(1)
-
     try:
-        # Создаем lock-файл
-        with open('bot.lock', 'w') as lock_file:
-            lock_file.write(str(os.getpid()))
-        logger.info("Lock-файл создан")
-
-        # Запускаем бота
         run_bot()
-
     except KeyboardInterrupt:
         logger.info("Бот остановлен вручную")
     except Exception as e:
         logger.critical(f"Критическая ошибка: {e}")
-        raise
     finally:
-        # Очистка при завершении
         cleanup_user_data()
-        if os.path.exists('bot.lock'):
-            os.remove('bot.lock')
-            logger.info("Lock-файл очищен")

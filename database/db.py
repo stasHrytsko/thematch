@@ -39,6 +39,15 @@ class Database:
                     compatibility_score REAL,
                     check_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    text TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                );
+                                    
             ''')
 
     def get_user(self, user_id):
@@ -116,4 +125,17 @@ class Database:
         except sqlite3.Error as e:
             logger.error(f"Ошибка получения даты рождения: {e}")
             return None 
-        
+    
+    def save_feedback(self, user_id: int, text: str) -> bool:
+        """Сохранение отзыва пользователя"""
+        try:
+            with self.conn:
+                self.conn.execute(
+                    'INSERT INTO feedback (user_id, text) VALUES (?, ?)',
+                    (user_id, text)
+                )
+            return True
+        except sqlite3.Error as e:
+            logger.error(f"Ошибка сохранения отзыва: {e}")
+            return False
+            

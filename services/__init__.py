@@ -1,11 +1,10 @@
 # services/__init__.py
-
 from .zodiac import ZodiacService
 from .biorhythm import BiorhythmCalculator
-from .numerology import NumerologyCalculator
+from .numerology import NumerologyService  
 
 __all__ = [
     'ZodiacService',
     'BiorhythmCalculator',
-    'NumerologyCalculator'
+    'NumerologyService'  
 ]

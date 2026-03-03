@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Tuple, Dict
 
-class NumerologyCalculator:
+class NumerologyService:
     """Сервис для нумерологических расчетов и определения совместимости"""
     
     # Матрица совместимости чисел судьбы (значения в процентах)
@@ -43,7 +43,7 @@ class NumerologyCalculator:
             result = sum(int(digit) for digit in str(result))
         
         return result
-
+    
     def calculate_compatibility(self, date1: datetime, date2: datetime) -> Tuple[float, Dict]:
         """
         Вычисляет нумерологическую совместимость двух дат
@@ -62,13 +62,18 @@ class NumerologyCalculator:
         # Получаем процент совместимости из матрицы
         compatibility = self.COMPATIBILITY_MATRIX[number1 - 1][number2 - 1]
         
+        # Вычисляем число партнерства
+        partnership_number = self.calculate_partnership_number(number1, number2)
+        
         # Формируем детали для вывода
         details = {
             'number1': number1,
             'number2': number2,
             'compatibility': compatibility,
             'description1': self.get_number_description(number1),
-            'description2': self.get_number_description(number2)
+            'description2': self.get_number_description(number2),
+            'partnership_number': partnership_number,
+            'partnership_description': self.get_partnership_description(partnership_number)
         }
         
         return compatibility, details
@@ -85,14 +90,59 @@ class NumerologyCalculator:
             str: Описание числа
         """
         descriptions = {
-            1: "Лидер, инициатор, независимая личность",
-            2: "Дипломат, миротворец, чуткая душа",
-            3: "Творец, коммуникатор, яркая личность",
-            4: "Строитель, организатор, надежный человек",
-            5: "Искатель свободы, динамичная натура",
-            6: "Наставник, хранитель, заботливая личность",
-            7: "Мыслитель, философ, глубокая личность",
-            8: "Руководитель, стратег, амбициозная натура",
-            9: "Гуманист, идеалист, мудрая душа"
+        1: "Лидер и независимая личность",
+        2: "Дипломат и миротворец",
+        3: "Творческий коммуникатор",
+        4: "Надёжный организатор",
+        5: "Свободолюбивый искатель",
+        6: "Заботливый наставник",
+        7: "Глубокий мыслитель",
+        8: "Амбициозный стратег",
+        9: "Мудрый идеалист"
         }
         return descriptions.get(number, "Неизвестное число")
+    
+    @staticmethod
+    def calculate_partnership_number(number1: int, number2: int) -> int:
+        """
+        Вычисляет число партнерства по числам судьбы партнеров
+        
+        Args:
+            number1: Число судьбы первого партнера (1-9)
+            number2: Число судьбы второго партнера (1-9)
+            
+        Returns:
+            int: Число партнерства (1-9)
+        """
+        # Складываем числа
+        total = number1 + number2
+        
+        # Если сумма больше 9, суммируем цифры
+        while total > 9:
+            total = sum(int(digit) for digit in str(total))
+            
+        return total
+
+    @staticmethod
+    def get_partnership_description(number: int) -> str:
+        """
+        Возвращает описание числа партнерства
+        
+        Args:
+            number: Число партнерства (1-9)
+            
+        Returns:
+            str: Описание союза
+        """
+        partnership_descriptions = {
+        1: "Союз лидерства и новых начинаний, важно уважать границы",
+        2: "Союз гармонии и сотрудничества, учитесь принимать решения",
+        3: "Союз творчества и радости, развивайте постоянство",
+        4: "Союз стабильности и порядка, будьте открыты переменам",
+        5: "Союз свободы и приключений, найдите баланс в отношениях",
+        6: "Союз заботы и домашнего очага, помните о своих потребностях",
+        7: "Союз мудрости и познания, не избегайте общения",
+        8: "Союз достатка и достижений, цените эмоциональную связь",
+        9: "Союз духовности и служения, учитесь отпускать обиды"
+        }
+        return partnership_descriptions.get(number, "Неизвестное число партнерства")

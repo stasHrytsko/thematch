@@ -1,0 +1,25 @@
+# Logs
+*.log
+
+# Database
+*.db
+
+# Python cache
+*.pyc
+*.pyo
+__pycache__/
+
+# Lock files
+bot.lock
+
+# Config with secrets
+*.conf
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Heroku
+Procfile
+runtime.txt

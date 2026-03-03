@@ -1,16 +1,15 @@
 # Логика проверки совместимости
 import logging
 from datetime import datetime
+from typing import Optional
 import random
 from telebot import TeleBot, types
 from database.db import Database
 
-
-
 # Импорты сервисов
 from services.zodiac import ZodiacService
 from services.biorhythm import BiorhythmCalculator
-from services.numerology import NumerologyCalculator
+from services.numerology import NumerologyService
 from services.descriptions import CompatibilityDescriptions
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ def register_compatibility_handlers(
     db: Database,
     zodiac_service: ZodiacService,
     biorhythm_calc: BiorhythmCalculator,
-    numerology_calc: NumerologyCalculator,
+    numerology_calc: NumerologyService,
     descriptions: CompatibilityDescriptions
 ):
     user_states = {}
@@ -46,7 +45,7 @@ def register_compatibility_handlers(
         )
         return markup
 
-    def validate_date(date_str: str) -> tuple[bool, str, datetime | None]:
+    def validate_date(date_str: str) -> tuple[bool, str, Optional[datetime]]:
         """Проверяет корректность даты"""
         try:
             if not date_str or len(date_str.split('.')) != 3:
@@ -362,9 +361,9 @@ def register_compatibility_handlers(
 
             # Общая совместимость (средневзвешенное значение)
             total_comp = (
-                zodiac_comp * 0.4 +  # 40% вес
+                zodiac_comp * 0.35 +  # 35% вес
                 bio_comp * 0.35 +    # 35% вес
-                num_comp * 0.25      # 25% вес
+                num_comp * 0.30      # 30% вес
             )
 
             # Формируем результат
@@ -407,11 +406,7 @@ def register_compatibility_handlers(
             elements_emoji = descriptions.get_emoji(details['elements_compatibility'])
             
             bio_emoji = {
-                'physical': descriptions.get_emoji(details['biorhythms']['rhythms']['physical']['compatibility']),
-                'emotional': descriptions.get_emoji(details['biorhythms']['rhythms']['emotional']['compatibility']),
-                'intellectual': descriptions.get_emoji(details['biorhythms']['rhythms']['intellectual']['compatibility']),
                 'heart': descriptions.get_emoji(details['biorhythms']['rhythms']['heart']['compatibility']),
-                'creative': descriptions.get_emoji(details['biorhythms']['rhythms']['creative']['compatibility']),
                 'intuitive': descriptions.get_emoji(details['biorhythms']['rhythms']['intuitive']['compatibility']),
                 'higher': descriptions.get_emoji(details['biorhythms']['rhythms']['higher']['compatibility'])
             }
@@ -421,80 +416,71 @@ def register_compatibility_handlers(
                 total_comp, 
                 descriptions.GENERAL_COMPATIBILITY_PHRASES
             )
-            
+
+            # Определяем тип совместимости стихий
             elements_type = descriptions.get_elements_compatibility_type(
                 details['element1'], 
                 details['element2']
             )
-            elements_phrase = random.choice(
-                descriptions.ELEMENTS_COMPATIBILITY_PHRASES[elements_type]
-            )
+            elements_phrase = random.choice(descriptions.ELEMENTS_COMPATIBILITY_PHRASES[elements_type])
 
             # Формируем результат
             result = f"""✨ Результат анализа совместимости:
 
-Вы: {details['sign1']} ({zodiac_service.get_sign_name(details['sign1'])})
-Дата рождения: {first_date.strftime('%d.%m.%Y')}
+Вы:
+{details['sign1']} {zodiac_service.get_sign_name(details['sign1'])} ({first_date.strftime('%d.%m.%Y')})
 «{descriptions.ZODIAC_DESCRIPTIONS[details['sign1']]}»
 
-Ваш партнер: {details['sign2']} ({zodiac_service.get_sign_name(details['sign2'])})
-Дата рождения: {second_date.strftime('%d.%m.%Y')}
+Партнер:
+{details['sign2']} {zodiac_service.get_sign_name(details['sign2'])} ({second_date.strftime('%d.%m.%Y')})
 «{descriptions.ZODIAC_DESCRIPTIONS[details['sign2']]}»
 
 ---
-
-🌟 Общая совместимость: {round(total_comp, 1):,.1f}% {main_emoji}
-«{compatibility_phrase}»
+🌟 Общая совместимость: 
+  {round(total_comp, 1)}% {descriptions.get_emoji(total_comp)}
+«{descriptions.get_random_phrase(total_comp, descriptions.GENERAL_COMPATIBILITY_PHRASES)}»
 
 ---
-
 🔯 Зодиакальный анализ:
 
-- Совместимость Знаков: {details['sign2']} + {details['sign1']} = {details['signs_compatibility']:,.1f}% {signs_emoji}
+Совместимость знаков:
+{details['sign1']} {zodiac_service.get_sign_name(details['sign1'])} + {details['sign2']} {zodiac_service.get_sign_name(details['sign2'])} = {round(details['signs_compatibility'], 1)}% {descriptions.get_emoji(details['signs_compatibility'])}
+«{descriptions.get_random_phrase(details['signs_compatibility'], descriptions.ZODIAC_COMPATIBILITY_PHRASES)}»
 
-- Совместимость Стихий: {zodiac_service.ELEMENTS_ICONS[details['element2']]} {details['element2']} + {zodiac_service.ELEMENTS_ICONS[details['element1']]} {details['element1']} = {details['elements_compatibility']:,.1f}% {elements_emoji}
-«{elements_phrase}»
+Совместимость стихий:
+{descriptions.get_element_emoji(details['element1'])} {details['element1']} + {descriptions.get_element_emoji(details['element2'])} {details['element2']} = {round(details['elements_compatibility'], 1)}% {descriptions.get_emoji(details['elements_compatibility'])}
+«{random.choice(descriptions.ELEMENTS_COMPATIBILITY_PHRASES[descriptions.get_elements_compatibility_type(details['element1'], details['element2'])])}»
 
 ---
-
 💫 Биоритмы:
 
-Физический: {details['biorhythms']['rhythms']['physical']['compatibility']:,.1f}% {bio_emoji['physical']}
-«{descriptions.get_biorhythm_description('physical', details['biorhythms']['rhythms']['physical']['compatibility'])}»
-
-Эмоциональный: {details['biorhythms']['rhythms']['emotional']['compatibility']:,.1f}% {bio_emoji['emotional']}
-«{descriptions.get_biorhythm_description('emotional', details['biorhythms']['rhythms']['emotional']['compatibility'])}»
-
-Интеллектуальный: {details['biorhythms']['rhythms']['intellectual']['compatibility']:,.1f}% {bio_emoji['intellectual']}
-«{descriptions.get_biorhythm_description('intellectual', details['biorhythms']['rhythms']['intellectual']['compatibility'])}»
-
-Сердечный: {details['biorhythms']['rhythms']['heart']['compatibility']:,.1f}% {bio_emoji['heart']}
+Сердечный (эмоциональная связь и принятие):
+  {round(details['biorhythms']['rhythms']['heart']['compatibility'], 1)}% {descriptions.get_emoji(details['biorhythms']['rhythms']['heart']['compatibility'])}
 «{descriptions.get_biorhythm_description('heart', details['biorhythms']['rhythms']['heart']['compatibility'])}»
 
-Творческий: {details['biorhythms']['rhythms']['creative']['compatibility']:,.1f}% {bio_emoji['creative']}
-«{descriptions.get_biorhythm_description('creative', details['biorhythms']['rhythms']['creative']['compatibility'])}»
-
-Интуитивный: {details['biorhythms']['rhythms']['intuitive']['compatibility']:,.1f}% {bio_emoji['intuitive']}
+Интуитивный (взаимопонимание и глубинное понимание):
+  {round(details['biorhythms']['rhythms']['intuitive']['compatibility'], 1)}% {descriptions.get_emoji(details['biorhythms']['rhythms']['intuitive']['compatibility'])}
 «{descriptions.get_biorhythm_description('intuitive', details['biorhythms']['rhythms']['intuitive']['compatibility'])}»
 
-Высший: {details['biorhythms']['rhythms']['higher']['compatibility']:,.1f}% {bio_emoji['higher']}
+Высший (духовная связь и единство целей):
+  {round(details['biorhythms']['rhythms']['higher']['compatibility'], 1)}% {descriptions.get_emoji(details['biorhythms']['rhythms']['higher']['compatibility'])}
 «{descriptions.get_biorhythm_description('higher', details['biorhythms']['rhythms']['higher']['compatibility'])}»
 
-Общая совместимость биоритмов: {details['biorhythms']['total']:,.1f}% {descriptions.get_emoji(details['biorhythms']['total'])}
+🔻Треугольник гармонии биоритмов: 
+  {round(details['biorhythms']['total'], 1)}% {descriptions.get_emoji(details['biorhythms']['total'])}
 «{descriptions.get_biorhythm_description('total', details['biorhythms']['total'])}»
 
 ---
-
 🔢 Числа судьбы:
 
-Ваше число: {details['numerology']['number1']}
-«{descriptions.NUMEROLOGY_DESCRIPTIONS[details['numerology']['number1']]}»
+Ваше число: {descriptions.get_number_emoji(details['numerology']['number1'])}
+«{descriptions.NUMEROLOGY_DESCRIPTIONS[details['numerology']['number1']].split(' ', 1)[1]}»
 
-Число партнера: {details['numerology']['number2']}
-«{descriptions.NUMEROLOGY_DESCRIPTIONS[details['numerology']['number2']]}»
+Число партнера: {descriptions.get_number_emoji(details['numerology']['number2'])}
+«{descriptions.NUMEROLOGY_DESCRIPTIONS[details['numerology']['number2']].split(' ', 1)[1]}»
 
-Совместимость чисел: {details['numerology']['compatibility']:,.1f}% {descriptions.get_emoji(details['numerology']['compatibility'])}
-«{descriptions.get_random_phrase(details['numerology']['compatibility'], descriptions.NUMEROLOGY_COMPATIBILITY_PHRASES)}»"""
+Число совместимости: {descriptions.get_number_emoji(details['numerology']['partnership_number'])}
+«{details['numerology']['partnership_description']}»"""
 
             return result
 
@@ -508,7 +494,7 @@ def register_compatibility_handlers(
             'function': process_date_choice,
             'filters': {'func': lambda message: message.text == "🔮 Проверить совместимость"}
         },
-        'use_saved_date': {  # Добавить этот обработчик
+        'use_saved_date': {
             'function': process_date_choice,
             'filters': {'func': lambda message: message.text in ["✅ Использовать сохраненную", "📝 Ввести новую"]}
         }
