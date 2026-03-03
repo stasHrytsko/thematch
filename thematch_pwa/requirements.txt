@@ -1,0 +1,14 @@
+# TheMatch PWA — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework for Vercel serverless functions
+flask>=3.0.0
+
+# Postgres driver (binary build avoids native compile on Vercel)
+psycopg2-binary>=2.9.9
+
+# Optional: Telegram bot (needed only for the /api/webhook endpoint)
+pyTelegramBotAPI>=4.20.0
+
+# Utilities (used in original bot, kept for parity)
+python-dotenv>=1.0.0
