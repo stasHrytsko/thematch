@@ -185,10 +185,8 @@ function renderResults(data) {
 
   // Trigger progress bar animations after the DOM is painted
   requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      animateRing("hero-ring", RING_LARGE_R, data.total);
-      animateBars();
-    });
+    animateRing("hero-ring", RING_LARGE_R, data.total);
+    animateBars();
   });
 
   $resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -309,14 +307,8 @@ function buildBiorhythmCard(b) {
 // Numerology card                                                      //
 // ------------------------------------------------------------------ //
 function buildNumerologyCard(n) {
-  const emoji1 = extractEmoji(n.number1_description);
-  const emoji2 = extractEmoji(n.number2_description);
-  const desc1  = stripEmoji(n.number1_description);
-  const desc2  = stripEmoji(n.number2_description);
-  const partEmoji = extractEmoji(
-    // partnership descriptions don't have emoji — use a star
-    `${n.partnership_number}`
-  );
+  const { emoji: emoji1, text: desc1 } = splitEmojiText(n.number1_description);
+  const { emoji: emoji2, text: desc2 } = splitEmojiText(n.number2_description);
 
   return `
     <div class="card">
@@ -370,15 +362,8 @@ function animateBars() {
 // ------------------------------------------------------------------ //
 // Emoji helpers                                                        //
 // ------------------------------------------------------------------ //
-// Extracts the leading emoji (or text emoji like "1️⃣") from a string
-function extractEmoji(str) {
-  if (!str) return "";
-  const match = str.match(/^(\S+)\s/);
-  return match ? match[1] : "";
-}
-
-function stripEmoji(str) {
-  if (!str) return "";
-  // Remove the first token if it looks like an emoji
-  return str.replace(/^\S+\s/, "").trim();
+function splitEmojiText(str) {
+  if (!str) return { emoji: "", text: "" };
+  const match = str.match(/^(\S+)\s+(.*)/s);
+  return match ? { emoji: match[1], text: match[2].trim() } : { emoji: "", text: str };
 }
