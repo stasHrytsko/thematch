@@ -1,35 +1,33 @@
-# api/webhook.py
-# POST /api/webhook — Telegram webhook endpoint.
-# Receives updates from Telegram and processes them via the bot library,
-# allowing the bot to run as a serverless function alongside the PWA.
 import sys
 import os
-
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-import json
-import logging
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from utils import get_logger, add_cors, cors_preflight
 
+logger = get_logger(__name__)
 app = Flask(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 
-def _cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    return response
+@app.route("/", methods=["POST", "OPTIONS"])
+@app.route("/api/webhook", methods=["POST", "OPTIONS"])
+def webhook():
+    if request.method == "OPTIONS":
+        return cors_preflight("POST, OPTIONS")
 
-
-def _get_bot():
-    """Lazily import and configure the bot. Returns None if token is missing."""
     if not BOT_TOKEN:
-        return None
+        return add_cors(
+            jsonify({"error": "BOT_TOKEN is not configured"}), "POST, OPTIONS"
+        ), 500
+
+    body = request.get_data(as_text=True)
+    if not body:
+        return add_cors(jsonify({"error": "Empty request body"}), "POST, OPTIONS"), 400
+
+    db = None
     try:
         import telebot
         from database.db import Database
@@ -53,35 +51,13 @@ def _get_bot():
             descriptions=CompatibilityDescriptions(),
         )
         register_feedback_handlers(bot=bot, db=db)
-        return bot
-    except Exception as exc:
-        logger.error("Failed to initialise bot: %s", exc)
-        return None
-
-
-@app.route("/", methods=["POST", "OPTIONS"])
-@app.route("/api/webhook", methods=["POST", "OPTIONS"])
-def webhook():
-    if request.method == "OPTIONS":
-        return _cors(make_response("", 200))
-
-    if not BOT_TOKEN:
-        return _cors(jsonify({"error": "BOT_TOKEN is not configured"})), 500
-
-    body = request.get_data(as_text=True)
-    if not body:
-        return _cors(jsonify({"error": "Empty request body"})), 400
-
-    try:
-        import telebot
-
-        bot = _get_bot()
-        if bot is None:
-            return _cors(jsonify({"error": "Bot initialisation failed"})), 500
 
         update = telebot.types.Update.de_json(body)
         bot.process_new_updates([update])
-        return _cors(jsonify({"status": "ok"}))
+        return add_cors(jsonify({"status": "ok"}), "POST, OPTIONS")
     except Exception as exc:
         logger.error("Error processing webhook update: %s", exc)
-        return _cors(jsonify({"error": "Internal error"})), 500
+        return add_cors(jsonify({"error": "Internal error"}), "POST, OPTIONS"), 500
+    finally:
+        if db is not None:
+            db.close()
