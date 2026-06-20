@@ -1,13 +1,3 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-
-# Environment / secrets
-.env
-.env.*
-!.env.example
-
 # Vercel
 .vercel
 

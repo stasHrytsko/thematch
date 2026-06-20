@@ -1,15 +1,16 @@
 // sw.js — Service Worker for TheMatch PWA
-// Strategy:
-//   • API requests  (/api/*) → network only, offline error JSON fallback
-//   • Static assets           → cache-first, update in background
-const CACHE_NAME = "thematch-v1";
+// Чистая статика: расчёт идёт в браузере, сети/бэкенда нет.
+// Стратегия: cache-first для всех ассетов, фоновое обновление кэша.
+const CACHE_NAME = "thematch-v2";
 
 const STATIC_ASSETS = [
   "/",
   "/index.html",
+  "/logic.js",
   "/app.js",
   "/style.css",
   "/manifest.json",
+  "/icons/icon.svg",
 ];
 
 // ------------------------------------------------------------------ //
@@ -43,29 +44,12 @@ self.addEventListener("activate", (event) => {
 });
 
 // ------------------------------------------------------------------ //
-// Fetch: route requests by strategy                                   //
+// Fetch: cache-first, then network (and update cache)                 //
 // ------------------------------------------------------------------ //
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  const url = new URL(request.url);
+  if (request.method !== "GET") return;
 
-  // API calls: network-only with offline fallback
-  if (url.pathname.startsWith("/api/")) {
-    event.respondWith(
-      fetch(request).catch(() =>
-        new Response(
-          JSON.stringify({ error: "You are offline. Please check your connection." }),
-          {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-          }
-        )
-      )
-    );
-    return;
-  }
-
-  // Static assets: cache-first, then network (and update cache)
   event.respondWith(
     caches.match(request).then((cached) => {
       const networkFetch = fetch(request)

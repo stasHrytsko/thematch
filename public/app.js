@@ -8,7 +8,6 @@
 // ------------------------------------------------------------------ //
 // Constants                                                            //
 // ------------------------------------------------------------------ //
-const API_URL = "/api/compatibility";
 const SVG_NS  = "http://www.w3.org/2000/svg";
 
 // Ring geometry
@@ -106,31 +105,16 @@ function handleCalculate() {
     return;
   }
 
-  const apiDate1 = isoToDMY(d1);
-  const apiDate2 = isoToDMY(d2);
-
   setLoading(true);
-  fetchCompatibility(apiDate1, apiDate2)
-    .then((result) => {
-      setLoading(false);
-      renderResults(result);
-    })
-    .catch((err) => {
-      setLoading(false);
-      showError(err.message || "Ошибка расчёта. Попробуйте ещё раз.");
-    });
-}
-
-async function fetchCompatibility(date1, date2) {
-  const res = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ date1, date2 }),
-  });
-
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-  return json;
+  // Расчёт выполняется полностью в браузере (logic.js) — без сети и бэкенда.
+  try {
+    const result = TheMatch.compute(isoToDate(d1), isoToDate(d2));
+    setLoading(false);
+    renderResults(result);
+  } catch (err) {
+    setLoading(false);
+    showError(err.message || "Ошибка расчёта. Попробуйте ещё раз.");
+  }
 }
 
 // ------------------------------------------------------------------ //
@@ -161,10 +145,10 @@ function resetForm() {
 // ------------------------------------------------------------------ //
 // Date helpers                                                         //
 // ------------------------------------------------------------------ //
-function isoToDMY(iso) {
-  // "2000-12-25" → "25.12.2000"
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
+function isoToDate(iso) {
+  // "2000-12-25" → локальная Date (полдень, чтобы избежать сдвига часового пояса)
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d, 12, 0, 0);
 }
 
 // ------------------------------------------------------------------ //
