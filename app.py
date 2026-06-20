@@ -1,6 +1,11 @@
+"""TheMatch — единое Flask-приложение для деплоя на Vercel.
+
+Vercel деплоит Flask как одну функцию с единым entrypoint (`app`).
+Все эндпоинты собраны здесь; статика раздаётся из `public/**` силами Vercel CDN.
+"""
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import random
 from datetime import datetime
@@ -12,17 +17,24 @@ from services.zodiac import ZodiacService
 from services.biorhythm import BiorhythmCalculator
 from services.numerology import NumerologyService
 from services.descriptions import CompatibilityDescriptions
+from database.db import Database
 
 logger = get_logger(__name__)
 app = Flask(__name__)
 
-_zodiac      = ZodiacService()
-_biorhythm   = BiorhythmCalculator()
-_numerology  = NumerologyService()
+_zodiac       = ZodiacService()
+_biorhythm    = BiorhythmCalculator()
+_numerology   = NumerologyService()
 _descriptions = CompatibilityDescriptions()
 
+_MAX_FEEDBACK_LENGTH = 2000
 
-def _validate_date(date_str: str):
+
+# ====================================================================== #
+# Helpers                                                                  #
+# ====================================================================== #
+
+def _validate_date(date_str: str) -> datetime:
     if not date_str or len(date_str.split(".")) != 3:
         raise ValueError("Use DD.MM.YYYY format")
     dt = datetime.strptime(date_str, "%d.%m.%Y")
@@ -33,7 +45,17 @@ def _validate_date(date_str: str):
     return dt
 
 
-@app.route("/", methods=["POST", "OPTIONS"])
+def _serialise(record: dict) -> dict:
+    out = {}
+    for key, val in record.items():
+        out[key] = val if isinstance(val, (int, float, str, bool, type(None))) else str(val)
+    return out
+
+
+# ====================================================================== #
+# POST /api/compatibility — основной расчёт совместимости                  #
+# ====================================================================== #
+
 @app.route("/api/compatibility", methods=["POST", "OPTIONS"])
 def compatibility():
     if request.method == "OPTIONS":
@@ -133,10 +155,125 @@ def compatibility():
     user_id = data.get("user_id")
     if user_id is not None:
         try:
-            from database.db import Database
             with Database() as db:
                 db.add_check_history(int(user_id), data["date1"], data["date2"], total)
         except Exception as exc:
             logger.warning("Could not save check history: %s", exc)
 
     return add_cors(jsonify(result), "POST, OPTIONS")
+
+
+# ====================================================================== #
+# POST /api/user — создать/получить пользователя                           #
+# ====================================================================== #
+
+@app.route("/api/user", methods=["POST", "OPTIONS"])
+def user():
+    if request.method == "OPTIONS":
+        return cors_preflight("POST, OPTIONS")
+
+    data = request.get_json(silent=True)
+    if data is None or "user_id" not in data:
+        return add_cors(jsonify({"error": "'user_id' is required"}), "POST, OPTIONS"), 400
+
+    try:
+        user_id = int(data["user_id"])
+    except (ValueError, TypeError):
+        return add_cors(jsonify({"error": "'user_id' must be an integer"}), "POST, OPTIONS"), 400
+
+    username = str(data.get("username", ""))
+
+    try:
+        with Database() as db:
+            db.create_user(user_id, username)
+            row = db.get_user(user_id)
+
+        if row is None:
+            return add_cors(jsonify({"error": "Failed to create user"}), "POST, OPTIONS"), 500
+
+        if row.get("birth_date"):
+            row["birth_date"] = str(row["birth_date"])
+
+        return add_cors(jsonify(row), "POST, OPTIONS")
+    except Exception as exc:
+        logger.error("Error in /api/user: %s", exc)
+        return add_cors(jsonify({"error": "Database error"}), "POST, OPTIONS"), 500
+
+
+# ====================================================================== #
+# POST /api/feedback — сохранить отзыв                                     #
+# ====================================================================== #
+
+@app.route("/api/feedback", methods=["POST", "OPTIONS"])
+def feedback():
+    if request.method == "OPTIONS":
+        return cors_preflight("POST, OPTIONS")
+
+    data = request.get_json(silent=True)
+    if data is None or "text" not in data:
+        return add_cors(jsonify({"error": "'text' field is required"}), "POST, OPTIONS"), 400
+
+    text = data["text"].strip()
+    if len(text) < 3:
+        return add_cors(
+            jsonify({"error": "Feedback is too short (minimum 3 characters)"}), "POST, OPTIONS"
+        ), 400
+    if len(text) > _MAX_FEEDBACK_LENGTH:
+        return add_cors(
+            jsonify({"error": f"Feedback is too long (maximum {_MAX_FEEDBACK_LENGTH} characters)"}),
+            "POST, OPTIONS",
+        ), 400
+
+    user_id = None
+    if "user_id" in data:
+        try:
+            user_id = int(data["user_id"])
+        except (ValueError, TypeError):
+            pass
+
+    try:
+        with Database() as db:
+            success = db.save_feedback(user_id, text)
+        if success:
+            return add_cors(
+                jsonify({"status": "ok", "message": "Feedback saved. Thank you!"}), "POST, OPTIONS"
+            )
+        return add_cors(jsonify({"error": "Failed to save feedback"}), "POST, OPTIONS"), 500
+    except Exception as exc:
+        logger.error("Error in /api/feedback: %s", exc)
+        return add_cors(jsonify({"error": "Database error"}), "POST, OPTIONS"), 500
+
+
+# ====================================================================== #
+# GET /api/history?user_id=&limit= — история проверок                      #
+# ====================================================================== #
+
+@app.route("/api/history", methods=["GET", "OPTIONS"])
+def history():
+    if request.method == "OPTIONS":
+        return cors_preflight("GET, OPTIONS")
+
+    user_id_raw = request.args.get("user_id")
+    if not user_id_raw:
+        return add_cors(
+            jsonify({"error": "'user_id' query parameter is required"}), "GET, OPTIONS"
+        ), 400
+
+    try:
+        user_id = int(user_id_raw)
+    except ValueError:
+        return add_cors(jsonify({"error": "'user_id' must be an integer"}), "GET, OPTIONS"), 400
+
+    limit_raw = request.args.get("limit", "10")
+    try:
+        limit = max(1, min(int(limit_raw), 50))
+    except ValueError:
+        limit = 10
+
+    try:
+        with Database() as db:
+            records = db.get_history(user_id, limit)
+        return add_cors(jsonify({"history": [_serialise(r) for r in records]}), "GET, OPTIONS")
+    except Exception as exc:
+        logger.error("Error in /api/history: %s", exc)
+        return add_cors(jsonify({"error": "Database error"}), "GET, OPTIONS"), 500

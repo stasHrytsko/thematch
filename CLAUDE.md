@@ -12,50 +12,53 @@
 
 ## Стек и деплой
 
-- **Backend:** Python + Flask как serverless-функции на **Vercel** (`api/*.py`).
+- **Backend:** Python + Flask, **одно приложение** (`app.py`, instance `app`),
+  деплоится на **Vercel** как единая функция (Flask backend framework).
 - **БД:** **Postgres** (Vercel Postgres / Supabase) через `psycopg2`, строка
   подключения в `DATABASE_URL`.
-- **Frontend:** vanilla JS PWA (статика в корне) — без фреймворков и сборки, с
-  Service Worker (оффлайн) и manifest (устанавливаемое приложение).
-- **Деплой:** Vercel, **zero-config** (без `vercel.json`). Vercel сам раздаёт
-  статику из корня и поднимает `api/*.py` как Python-функции (определяется по
-  `requirements.txt`). В настройках проекта **Root Directory = `.`** (корень репо).
+- **Frontend:** vanilla JS PWA (статика в `public/**`) — без фреймворков и сборки,
+  с Service Worker (оффлайн) и manifest (устанавливаемое приложение).
+- **Деплой:** Vercel. Flask определяется по `requirements.txt`; entrypoint задан
+  в `pyproject.toml` (`[tool.vercel] entrypoint = "app:app"`). Статику из `public/**`
+  Vercel раздаёт с CDN, `/api/*` обслуживает Flask-функция. **Root Directory = `.`**
+  Подробности: https://vercel.com/docs/frameworks/backend/flask
 
 ## Структура
 
-Раскладка под Vercel: статика и `api/` в корне репозитория.
-
 ```
-api/                ← serverless-эндпоинты Flask (по файлу на маршрут)
-  compatibility.py  ← POST /api/compatibility — основной расчёт
-  user.py           ← POST /api/user — создать/получить пользователя
-  feedback.py       ← POST /api/feedback — сохранить отзыв
-  history.py        ← GET  /api/history?user_id=&limit= — история проверок
+app.py              ← ЕДИНЫЙ Flask entrypoint: все маршруты /api/* в одном `app`
+  /api/compatibility  (POST) — основной расчёт
+  /api/user           (POST) — создать/получить пользователя
+  /api/feedback       (POST) — сохранить отзыв
+  /api/history        (GET)  — история проверок (?user_id=&limit=)
+pyproject.toml      ← [tool.vercel] entrypoint = "app:app"
 services/           ← ядро расчётов (чистая логика, без Flask/БД)
   zodiac.py         ← знаки, стихии, их совместимость
   biorhythm.py      ← биоритмы (heart / intuitive / higher)
   numerology.py     ← числа судьбы и партнёрства
   descriptions.py   ← тексты, фразы, эмодзи под диапазоны (самый большой файл)
 database/db.py      ← Postgres-слой: класс Database + get_connection/init_db
-index.html          ← фронтенд PWA (раздаётся как `/`)
-app.js              ← вся UI-логика: форма, запрос к API, рендер результата
-style.css           ← стили (mobile-first, max-width контейнера)
-sw.js               ← Service Worker (кэш статики, оффлайн-ответ для /api)
-manifest.json       ← PWA-манифест
-icons/icon.svg      ← иконка приложения
 utils.py            ← get_logger, add_cors, cors_preflight
+public/             ← статика PWA (Vercel раздаёт из public/** с CDN)
+  index.html        ← фронтенд (раздаётся как `/`)
+  app.js            ← вся UI-логика: форма, запрос к API, рендер результата
+  style.css         ← стили (mobile-first, max-width контейнера)
+  sw.js             ← Service Worker (кэш статики, оффлайн-ответ для /api)
+  manifest.json     ← PWA-манифест
+  icons/icon.svg    ← иконка приложения
 requirements.txt    ← flask, psycopg2-binary, python-dotenv
 .env.example        ← шаблон переменных окружения (DATABASE_URL)
 ```
 
-> Общие модули (`services/`, `database/`, `utils.py`) попадают в бандл функции
-> через трассировку импортов Vercel — отдельный `includeFiles` не нужен.
+> Всё Flask-приложение собирается в один бандл функции; общие модули
+> (`services/`, `database/`, `utils.py`) подтягиваются как обычные импорты `app.py`.
 
 ## Как это работает
 
 1. Пользователь вводит две даты рождения в `index.html` → `app.js` шлёт `POST
    /api/compatibility` с `{date1, date2, user_id?}` в формате `ДД.ММ.ГГГГ`.
-2. `api/compatibility.py` валидирует даты, вызывает три сервиса и считает итог:
+2. Маршрут `/api/compatibility` в `app.py` валидирует даты, вызывает три сервиса
+   и считает итог:
    **`total = zodiac*0.35 + biorhythm*0.35 + numerology*0.30`**.
    Все под-оценки **симметричны** — результат не зависит от порядка дат
    (`compat(A,B) == compat(B,A)`). Матрицы зодиака/нумерологии содержат
@@ -67,10 +70,11 @@ requirements.txt    ← flask, psycopg2-binary, python-dotenv
 
 ### Соглашения по коду API
 
-- Каждый `api/*.py` — самостоятельное Flask-приложение, экспортирующее `app`
-  (модель Vercel «один файл = одна функция»).
-- В начале файла: `sys.path.insert(0, .. )`, чтобы импортировать `utils`,
-  `services`, `database` из корня. **Не ломать этот путь при перемещении файлов.**
+- **Один Flask-instance `app` в `app.py`** — все маршруты регистрируются на нём.
+  Новый эндпоинт = новая функция с `@app.route("/api/...")` в этом же файле.
+  Не плодить отдельные Flask-приложения по файлам (Vercel ждёт единый entrypoint).
+- `app.py` делает `sys.path.insert(0, <корень>)`, чтобы импортировать `utils`,
+  `services`, `database`. **Не ломать этот путь.**
 - Все ответы оборачиваются в `add_cors(...)`; на `OPTIONS` — `cors_preflight(...)`.
 - БД используется как контекст-менеджер: `with Database() as db: ...`
   (соединение на один запрос, Vercel-функции stateless).
@@ -90,8 +94,8 @@ requirements.txt    ← flask, psycopg2-binary, python-dotenv
 ```bash
 pip install -r requirements.txt
 cp .env.example .env          # вписать DATABASE_URL
-# фронтенд: открыть index.html (или раздать статикой из корня)
-# api: через `vercel dev` либо запустить нужный api/*.py как Flask-приложение
+# всё приложение (статика + /api/*): vercel dev
+# только Flask локально: flask --app app run   (статику отдать отдельно из public/)
 ```
 
 ## Переменные окружения
