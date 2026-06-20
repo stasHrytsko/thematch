@@ -48,6 +48,10 @@ requirements.txt    ← flask, psycopg2-binary, python-dotenv
    /api/compatibility` с `{date1, date2, user_id?}` в формате `ДД.ММ.ГГГГ`.
 2. `api/compatibility.py` валидирует даты, вызывает три сервиса и считает итог:
    **`total = zodiac*0.35 + biorhythm*0.35 + numerology*0.30`**.
+   Все под-оценки **симметричны** — результат не зависит от порядка дат
+   (`compat(A,B) == compat(B,A)`). Матрицы зодиака/нумерологии содержат
+   несимметричные пары, поэтому в `get_signs_compatibility` и
+   `NumerologyService.calculate_compatibility` берётся среднее двух направлений.
 3. Возвращает JSON со счётом, эмодзи, описаниями и фразами; `app.js` рендерит
    результат (кольца, секции). Если передан `user_id` — результат пишется в
    `checks_history`.
@@ -84,6 +88,12 @@ cp .env.example .env          # вписать DATABASE_URL
 ## Переменные окружения
 
 - `DATABASE_URL` — строка подключения Postgres (обязательно для эндпоинтов с БД).
+
+## Заметки
+
+- **Иконки PWA** — пока используется только `public/icons/icon.svg` (manifest и
+  `apple-touch-icon` ссылаются на него). Для лучшей поддержки iOS стоит добавить
+  растровые `icon-192.png` / `icon-512.png` и вернуть их в `manifest.json`.
 
 ---
 

@@ -59,8 +59,13 @@ class NumerologyService:
         number1 = self.calculate_life_path_number(date1)
         number2 = self.calculate_life_path_number(date2)
         
-        # Получаем процент совместимости из матрицы
-        compatibility = self.COMPATIBILITY_MATRIX[number1 - 1][number2 - 1]
+        # Получаем процент совместимости из матрицы.
+        # Совместимость симметрична: усредняем оба направления, так как
+        # матрица содержит несимметричные пары и результат не должен
+        # зависеть от того, чья дата введена первой.
+        forward = self.COMPATIBILITY_MATRIX[number1 - 1][number2 - 1]
+        backward = self.COMPATIBILITY_MATRIX[number2 - 1][number1 - 1]
+        compatibility = (forward + backward) / 2
         
         # Вычисляем число партнерства
         partnership_number = self.calculate_partnership_number(number1, number2)

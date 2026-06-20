@@ -115,10 +115,17 @@ class ZodiacService:
         return None
 
     def get_signs_compatibility(self, sign1: str, sign2: str) -> float:
-        """Возвращает процент совместимости между двумя знаками"""
+        """Возвращает процент совместимости между двумя знаками.
+
+        Совместимость симметрична: результат не зависит от порядка знаков.
+        Матрица содержит несколько несимметричных пар, поэтому берём среднее
+        двух направлений, чтобы compat(a, b) == compat(b, a).
+        """
         sign1_index = next(i for i, (symbol, _, _, _) in enumerate(self.ZODIAC_RANGES) if symbol == sign1)
         sign2_index = next(i for i, (symbol, _, _, _) in enumerate(self.ZODIAC_RANGES) if symbol == sign2)
-        return self.COMPATIBILITY_MATRIX[sign1_index][sign2_index]
+        forward = self.COMPATIBILITY_MATRIX[sign1_index][sign2_index]
+        backward = self.COMPATIBILITY_MATRIX[sign2_index][sign1_index]
+        return (forward + backward) / 2
 
     def get_sign_name(self, sign: str) -> str:
         """Returns zodiac sign name for symbol"""

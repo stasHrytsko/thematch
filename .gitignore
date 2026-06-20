@@ -1,25 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel
+
 # Logs
 *.log
 
-# Database
-*.db
-
-# Python cache
-*.pyc
-*.pyo
-__pycache__/
-
-# Lock files
-bot.lock
-
-# Config with secrets
-*.conf
-.env
+# Editor / local tooling
+.claude/
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Heroku
-Procfile
-runtime.txt
